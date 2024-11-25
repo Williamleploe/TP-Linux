@@ -255,3 +255,96 @@ lost+found  sensitive1.txt  sensitive2.txt
   VG UUID               HWHxR3-TW7t-BYFQ-bfPD-Mit8-Z9Ib-JSin2v
 ``` 
 ## étape 3 : Automatisation avec un script de sauvegarde
+1. Créer le script secure_backup.sh
+   ```powershell
+   sudo nano /usr/local/bin/secure_backup.sh
+    ````
+2.Ajoutez le contenu suivant :
+```powershell
+#!/bin/bash
+
+# Répertoire source et destination
+SOURCE_DIR="/mnt/secure_data"
+BACKUP_DIR="/backup"
+DATE=$(date +"%Y%m%d")
+BACKUP_FILE="$BACKUP_DIR/secure_data_$DATE.tar.gz"
+
+# Exclure les fichiers temporaires et cachés
+TAR_EXCLUDE="--exclude=*.tmp --exclude=*.log --exclude=.*"
+
+# Créer une archive compressée
+mkdir -p "$BACKUP_DIR"  # Assure que le répertoire existe
+tar $TAR_EXCLUDE -czf "$BACKUP_FILE" "$SOURCE_DIR"
+
+# Rotation des sauvegardes (conserver uniquement les 7 dernières)
+find "$BACKUP_DIR" -type f -name "secure_data_*.tar.gz" -mtime +7 -exec rm {} \;
+
+# Log de confirmation
+echo "Sauvegarde réalisée : $BACKUP_FILE"
+```
+Étape 2 : Rendre le script exécutable
+```
+sudo chmod +x /usr/local/bin/secure_backup.sh
+```
+### 2. Tester le script
+```powershell 
+[root@localhost secure_data]# sudo /usr/local/bin/secure_backup.sh
+tar: Removing leading `/' from member names
+Sauvegarde réalisée : /backup/secure_data_20241125.tar.gz
+``` 
+2.Vérifiez que le fichier de sauvegarde a été créé dans /backup :
+```powershell
+[root@localhost secure_data]# ls /backup
+secure_data_20241125.tar.gz
+```
+### 3- Automatiser avec une tâche cron
+```powershell
+[root@localhost ~]# sudo crontab -e
+```
+Ajoutez la tâche pour exécuter le script chaque jour à 3h du matin :
+```powershell 
+0 3 * * * /usr/local/bin/secure_backup.sh
+```
+### 4. Vérification des tâches cron
+1.Listez les tâches cron  pour  assurer que la tâche est bien configurée :
+```powershell 
+[root@localhost ~]# sudo crontab -l
+0 3 * * * /usr/local/bin/secure_backup.sh
+```
+2.Vérifiez les logs du système pour confirmer l’exécution automatique après une journée 
+```powershell 
+grep CRON /var/log/syslog
+```
+## Étape 4 : Surveillance avancée avec auditd
+1.Configurer auditd pour surveiller /etc :
+```
+sudo auditctl -w /etc -p wa -k etc_changes
+``` 
+Pour vérifier que la règle a bien été ajoutée, exécutez :
+```powershell
+[root@localhost ~]# sudo auditctl -l
+-w /etc -p wa -k etc_changes
+```
+ 2 : Vérifier les logs d'audit
+pour vérifiez les logs d'audit pour voir si l'événement a été enregistré :
+```powershell
+sudo ausearch -k etc_changes
+```
+
+
+ 3 . Analyser les événements et exporter les logs filtrés
+
+Exporter les logs filtrés:
+```powershell
+[root@localhost ~]# sudo ausearch -k etc_changes > /var/log/audit_etc.log
+```
+ le fichier de logs a bien été créé et qu'il contient les événements :
+```powershell
+[root@localhost ~]# cat /var/log/audit_etc.log
+```
+4 Vérifier les journaux d’audit
+
+Pour afficher les logs d'audit récents :
+```
+sudo aureport -k
+```
