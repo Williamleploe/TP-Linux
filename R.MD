@@ -349,3 +349,106 @@ Pour afficher les logs d'audit récents :
 sudo aureport -k
 ```
 ## Étape 5 : Sécurisation avec Firewalld
+1 . configuration du part-feu 
+verification de son satut:
+```powershell
+[root@localhost ~]# sudo systemctl status firewalld
+● firewalld.service - firewalld - dynamic firewall daemon
+     Loaded: loaded (/usr/lib/systemd/system/firewalld.service; enabled; pr>
+     Active: active (running) since Mon 2024-11-25 14:54:36 CET; 5min ago
+       Docs: man:firewalld(1)
+   Main PID: 883 (firewalld)
+      Tasks: 2 (limit: 48902)
+     Memory: 45.2M
+        CPU: 2.179s
+     CGroup: /system.slice/firewalld.service
+             └─883 /usr/bin/python3 -s /usr/sbin/firewalld --nofork --nopid
+```
+2 Autoriser les services nécessaires
+
+Autorisez les ports pour SSH (22), HTTP (80), et HTTPS (443) :
+
+```powershell
+[root@localhost ~]# sudo firewall-cmd --permanent --add-service=ssh
+Warning: ALREADY_ENABLED: ssh
+success
+[root@localhost ~]# sudo firewall-cmd --permanent --add-service=http
+success
+[root@localhost ~]# sudo firewall-cmd --permanent --add-service=https
+Warning: ALREADY_ENABLED: https
+success
+```
+Vérifiez les services autorisés
+```powershell
+[root@localhost ~]# sudo firewall-cmd --list-all
+public (active)
+  target: default
+  icmp-block-inversion: no
+  interfaces: enp0s3 enp0s8
+  sources:
+  services: cockpit dhcpv6-client https ssh
+  ports: 2222/tcp
+  protocols:
+  forward: yes
+  masquerade: no
+  forward-ports:
+  source-ports:
+  icmp-blocks:
+  rich rules:
+```
+3 : Bloquer tout autre trafic
+
+Passez le pare-feu en mode deny-by-default en rejetant toutes les autres connexions
+```powershell
+[root@localhost ~]# sudo firewall-cmd --permanent --set-default-zone=drop
+```
+Rechargez la configuration pour appliquer cette règle :
+```
+[root@localhost ~]# sudo firewall-cmd --reload
+success
+```
+### 2. Bloquer des IP suspectes
+
+1 . Identifiez les adresses IP suspectes à partir des logs d'audit ou des connexions réseau
+
+Liste des connexions actives :
+```powersell
+[root@localhost ~]# sudo ss -tulnp
+Netid  State   Recv-Q  Send-Q     Local Address:Port     Peer Address:Port  Process
+udp    UNCONN  0       0              127.0.0.1:323           0.0.0.0:*      users:(("chronyd",pid=890,fd=5))
+udp    UNCONN  0       0                  [::1]:323              [::]:*      users:(("chronyd",pid=890,fd=6))
+tcp    LISTEN  0       128              0.0.0.0:22            0.0.0.0:*      users:(("sshd",pid=929,fd=3))
+tcp    LISTEN  0       128                 [::]:22               [::]:*      users:(("sshd",pid=929,fd=4))
+```
+Analyse des journaux 
+```powersell
+[root@localhost ~]# sudo grep "Failed password" /var/log/secure
+grep: /var/log/secure: binary file matches
+```
+
+
+
+
+
+
+### 3. Restreindre SSH à un sous-réseau spécifique
+ pour autoriser uniquement les adresses IP du sous-réseau 192.168.1.0/24 à accéder au service SSH
+
+```powersell
+[root@localhost ~]# sudo firewall-cmd --permanent --add-rich-rule='rule family="ipv4" source address="192.168.1.0/24" service name="ssh" accept'
+success
+```
+Bloquez les autres connexions SSH en modifiant la règle par défaut :
+```powershell
+[root@localhost ~]# sudo firewall-cmd --permanent --remove-service=ssh
+success
+```
+Rechargez la configuration :
+```powershell 
+[root@localhost ~]# sudo firewall-cmd --reload
+success
+```
+ 2 : Vérifiez les règles appliquées
+ ```powershell
+ sudo firewall-cmd --list-all
+ ```
