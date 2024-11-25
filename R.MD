@@ -348,3 +348,4 @@ Pour afficher les logs d'audit récents :
 ```
 sudo aureport -k
 ```
+## Étape 5 : Sécurisation avec Firewalld
